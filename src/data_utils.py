@@ -12,6 +12,7 @@ class PoseDB:
     def __init__(self, poses: torch.Tensor, character_rot: torch.Tensor) -> None:
         self.poses = poses  # Shape: (num_frames, num_joints, 3)
         self.character_rot = character_rot  # Shape: (num_frames, 3)
+        self.num_joints = poses.shape[1]
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         return self.poses[index], self.character_rot[index]
@@ -29,10 +30,10 @@ class FeaturesDB:
         self.pose_db = pose_db
 
         assert len(self.traj_pos_indices) == len(self.traj_deltas)
-        assert min(self.traj_deltas) >= 0, "Only future positions are supported"
+        assert min(self.traj_deltas) >= 0, "[PyMM] Only future positions are supported"
 
         start_time = time.time()
-        print("Creating FeaturesDB from PoseDB...")
+        print("[PyMM] Creating FeaturesDB from PoseDB...")
 
         self.features = torch.empty(
             (len(pose_db) - self.max_traj_frames, len(self.traj_pos_indices_full)),
@@ -57,7 +58,9 @@ class FeaturesDB:
         self.normalize_features()
 
         end_time = time.time()
-        print(f"FeaturesDB created in {end_time - start_time:.2f} seconds with {len(self.features)} frames.")
+        print(
+            f"[PyMM] FeaturesDB created in {end_time - start_time:.2f} seconds with {len(self.features)} frames."
+        )
 
     def __getitem__(self, index: int) -> torch.Tensor:
         return self.features[index]
@@ -112,7 +115,7 @@ def load_data(data_dir: str, scale: float, local_forward_hips: tuple) -> tuple[P
 
 
 def create_pose_db(animations: list[BVH], local_forward_hips: tuple) -> PoseDB:
-    print("Creating PoseDB from animations...")
+    print("[PyMM] Creating PoseDB from animations...")
     start_time = time.time()
     poses = []
     character_rots = []
@@ -146,5 +149,5 @@ def create_pose_db(animations: list[BVH], local_forward_hips: tuple) -> PoseDB:
     character_rots = torch.cat(character_rots, dim=0)
     pose_db = PoseDB(poses, character_rots)
     end_time = time.time()
-    print(f"PoseDB created in {end_time - start_time:.2f} seconds with {len(pose_db)} frames.")
+    print(f"[PyMM] PoseDB created in {end_time - start_time:.2f} seconds with {len(pose_db)} frames.")
     return pose_db
