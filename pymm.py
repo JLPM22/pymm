@@ -1,13 +1,35 @@
 import argparse
-import numpy as np
-import pymotion.rotations.quat as quat
+import torch
+import pymotion.rotations.quat_torch as quat
 
-from pyray import *
+from pyray import (
+    init_window,
+    set_target_fps,
+    begin_drawing,
+    clear_background,
+    begin_mode_3d,
+    end_mode_3d,
+    draw_sphere,
+    draw_line_3d,
+    draw_grid,
+    end_drawing,
+    draw_text,
+    draw_fps,
+    close_window,
+    window_should_close,
+    Vector3,
+    Camera3D,
+    RAYWHITE,
+    MAROON,
+    BLUE,
+    DARKGRAY,
+    update_camera,
+)
 from raylib import CAMERA_ORBITAL, CAMERA_PERSPECTIVE
 from src.data_utils import load_data
 
 
-def main(data_dir, scale, local_forward_hips):
+def main(data_dir: str, scale: float, local_forward_hips: tuple) -> None:
     pose_db, features_db = load_data(data_dir, scale, local_forward_hips)
 
     # --- Window and Camera Setup ---
@@ -29,7 +51,7 @@ def main(data_dir, scale, local_forward_hips):
 
     # --- Animation State ---
     frame_index = 1000
-    num_frames = len(pose_db)
+    num_frames = len(features_db)
 
     # --- Main Animation Loop ---
     while not window_should_close():
@@ -42,7 +64,7 @@ def main(data_dir, scale, local_forward_hips):
         root_joint_pos = pose_db.poses[frame_index, 0]
 
         # UPDATE THE CAMERA TARGET TO FOLLOW THE ROOT JOINT
-        camera.target = Vector3(root_joint_pos[0], root_joint_pos[1], root_joint_pos[2])
+        camera.target = Vector3(root_joint_pos[0].item(), root_joint_pos[1].item(), root_joint_pos[2].item())
 
         # Update camera movement based on the new target
         update_camera(camera, CAMERA_ORBITAL)
@@ -54,22 +76,30 @@ def main(data_dir, scale, local_forward_hips):
         begin_mode_3d(camera)
 
         # Draw the pose for the current frame
-        current_pose = pose_db.poses[frame_index]
+        current_pose, character_rot = pose_db[frame_index]
         for joint_position in current_pose:
             # Create a Vector3 from the joint's [x, y, z] coordinates and scale it down
-            pos_vec = Vector3(joint_position[0], joint_position[1], joint_position[2])
+            pos_vec = Vector3(joint_position[0].item(), joint_position[1].item(), joint_position[2].item())
             draw_sphere(pos_vec, 0.05, MAROON)  # Draw a small sphere at the joint's position
-        character_rot = pose_db.character_rot[frame_index]
-        character_forward = quat.mul_vec(character_rot, np.array([0.0, 0.0, 1.0]))
+        character_forward = quat.mul_vec(character_rot, torch.tensor([0.0, 0.0, 1.0]))
         draw_line_3d(
-            Vector3(root_joint_pos[0], root_joint_pos[1], root_joint_pos[2]),
+            Vector3(root_joint_pos[0].item(), root_joint_pos[1].item(), root_joint_pos[2].item()),
             Vector3(
-                root_joint_pos[0] + character_forward[0],
-                root_joint_pos[1] + character_forward[1],
-                root_joint_pos[2] + character_forward[2],
+                root_joint_pos[0].item() + character_forward[0].item(),
+                root_joint_pos[1].item() + character_forward[1].item(),
+                root_joint_pos[2].item() + character_forward[2].item(),
             ),
-            BLUE,
+            MAROON,
         )
+
+        # Draw features for the current frame
+        trajectory_position_features = features_db.get_trajectory_position(
+            frame_index, normalized=False, world_space=True
+        )
+        for i in range(0, len(trajectory_position_features), 2):
+            x = trajectory_position_features[i].item()
+            z = trajectory_position_features[i + 1].item()
+            draw_sphere(Vector3(x, 0.0, z), 0.05, BLUE)
 
         draw_grid(20, 1.0)  # Draw a ground plane for reference
 
