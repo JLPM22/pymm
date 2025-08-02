@@ -23,6 +23,7 @@ from pyray import (
     RAYWHITE,
     MAROON,
     BLUE,
+    SKYBLUE,
     DARKGRAY,
     get_mouse_delta,
     is_mouse_button_down,
@@ -131,6 +132,28 @@ def main(data_dir: str, scale: float, local_forward_hips: tuple) -> None:
             x = trajectory_position_features[i].item()
             z = trajectory_position_features[i + 1].item()
             draw_sphere(Vector3(x, 0.0, z), 0.05, BLUE)
+        pose_position_features = features_db.get_pose_features_position(
+            frame_index, normalized=False, world_space=True
+        )
+        for i in range(0, len(pose_position_features), 3):
+            x = pose_position_features[i].item()
+            y = pose_position_features[i + 1].item()
+            z = pose_position_features[i + 2].item()
+            draw_sphere(Vector3(x, y, z), 0.055, SKYBLUE)
+        pose_velocity_features = features_db.get_pose_features_velocity(
+            frame_index, normalized=False, world_space=True
+        )
+        for i in range(0, len(pose_velocity_features), 3):
+            x = pose_velocity_features[i].item()
+            y = pose_velocity_features[i + 1].item()
+            z = pose_velocity_features[i + 2].item()
+            joint = features_db.pose_vel_joints[i // 3]  # Get the joint index for velocity features
+            pos = Vector3(
+                current_pose[joint, 0].item(), current_pose[joint, 1].item(), current_pose[joint, 2].item()
+            )
+            viz_factor = 0.2  # Scale factor for visualization
+            vel = Vector3(x * viz_factor, y * viz_factor, z * viz_factor)
+            draw_line_3d(pos, Vector3(vel.x + pos.x, vel.y + pos.y, vel.z + pos.z), SKYBLUE)
 
         draw_grid(20, 1.0)  # Draw a ground plane for reference
 

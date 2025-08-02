@@ -8,10 +8,11 @@ from pymotion.ops.skeleton_torch import fk
 
 
 class PoseDB:
-    def __init__(self, poses: torch.Tensor, character_rot: torch.Tensor) -> None:
-        self.poses = poses  # Shape: (num_frames, num_joints, 3)
-        self.character_rot = character_rot  # Shape: (num_frames, 3)
+    def __init__(self, poses: torch.Tensor, character_rot: torch.Tensor, frame_time: float) -> None:
+        self.poses = poses  # World space positions. Shape: (num_frames, num_joints, 3)
+        self.character_rot = character_rot  # World space rotation. Shape: (num_frames, 3)
         self.num_joints = poses.shape[1]
+        self.frame_time = frame_time  # Time per frame in seconds
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         return self.poses[index], self.character_rot[index]
@@ -25,7 +26,10 @@ def create_pose_db(animations: list[BVH], local_forward_hips: tuple) -> PoseDB:
     start_time = time.time()
     poses = []
     character_rots = []
+    frame_time = animations[0].data["frame_time"]
     for animation in animations:
+        if int(round(frame_time)) != int(round(animation.data["frame_time"])):
+            raise ValueError(f"Frame time mismatch: {frame_time} != {animation.data['frame_time']}")
         local_rotations, local_positions, parents, offsets, _, _ = animation.get_data()
         local_rotations = torch.from_numpy(local_rotations).float()
         local_positions = torch.from_numpy(local_positions).float()
@@ -53,7 +57,11 @@ def create_pose_db(animations: list[BVH], local_forward_hips: tuple) -> PoseDB:
         character_rots.append(character_rot)
     poses = torch.cat(poses, dim=0)
     character_rots = torch.cat(character_rots, dim=0)
-    pose_db = PoseDB(poses, character_rots)
+    pose_db = PoseDB(
+        poses,
+        character_rots,
+        frame_time,
+    )
     end_time = time.time()
     print(f"[PyMM] PoseDB created in {end_time - start_time:.2f} seconds with {len(pose_db)} frames.")
     return pose_db
